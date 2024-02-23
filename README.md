@@ -5,6 +5,7 @@ A SQLite viewer in the command line interface (CLI) made with Rust.
 ## Run
 
 To run the application, use the following command:
+> cargo run connect dbname
 
 
 Note: The database file should be located in the `src` directory. We're still working on fixing this limitation.
