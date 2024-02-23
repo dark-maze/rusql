@@ -32,8 +32,9 @@ impl DataBase {
 
 fn main() {
 	let args: Vec<String> = env::args().collect();
-	if args.len() == 0 {
-		eprint!("Error no args been received");
+	if args.len() != 2  {
+		eprint!("Error args received are invalid (Should be 2 args)");
+		return;
 	}
 	get_command(args);
 }
