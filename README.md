@@ -12,7 +12,10 @@ A SQLite viewer in the command line interface (CLI) made with Rust.
   ![Tables Example](https://i.ibb.co/jfG65L5/tables-example.png)
 
 * **records**: Returns all records from a table.
-  * **Usage**: `rusql dbpath -records tablename`
+  * **Usage**: `rusql dbpath -records tablename -args`
+	* **-a**: `returns all records`
+	* **-r num**: `returns a random number of records between 1 and num`
+	* **-n num**: `returns the first num records`
 
   ![Records Example](https://i.ibb.co/ZL6hKqJ/records-example.png)
 
