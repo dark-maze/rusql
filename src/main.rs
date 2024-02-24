@@ -8,6 +8,14 @@ struct DataBase{
 conn: Connection
 }
 
+enum Commands{
+Tables,
+Info,
+Records,
+Exit,
+Clear,
+}
+
 impl DataBase {
 	fn new(conn: Connection) -> DataBase {
 		DataBase{
@@ -32,8 +40,8 @@ impl DataBase {
 
 fn main() {
 	let args: Vec<String> = env::args().collect();
-	if args.len() != 2  {
-		eprint!("Error args received are invalid (Should be 2 args)");
+	if args.len() < 3  {
+		eprint!("Error args received are invalid");
 		return;
 	}
 	get_command(args);
@@ -69,12 +77,24 @@ fn run(db:DataBase){
 			.expect("faild to get the command");
 		let input = input.trim();
 		println!("");
-		match input{
-			"tables" => fetch_table(&db),
-			"clear" => clear_terminal(),
-			"exit" => break,
-			_ => println!("Command {} Not implemented yet", input),
-		}
+		let command = match input{
+			 "tables" => Commands::Tables,
+			"records" => Commands::Records,
+			"info" => Commands::Info,
+			"clear" => Commands::Clear,
+			"exit" => Commands::Exit,
+			_ => {
+				println!("Command {} Not implemented yet", input);
+				continue;
+			},
+		};
+		match command {
+			Commands::Tables => fetch_table(&db),
+			Commands::Records => println!("Not Implemented Yet"),
+			Commands::Info => println!("Not Implemented Yet"),
+			Commands::Clear => clear_terminal(),
+			Commands::Exit => break,
+		};
 	}
 }
 
