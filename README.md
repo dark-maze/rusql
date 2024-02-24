@@ -8,11 +8,13 @@ A SQLite viewer in the command line interface (CLI) made with Rust.
 
 * **tables**: Returns all table names in the database.
   * **Usage**: `rusql dbpath -tables`
-  ![Tables Example](https://ibb.co/wgC0LKL)
+
+  ![Tables Example](https://i.ibb.co/jfG65L5/tables-example.png)
 
 * **records**: Returns all records from a table.
   * **Usage**: `rusql dbpath -records tablename`
-  ![Records Example](https://ibb.co/j6vLGn5)
+
+  ![Records Example](https://i.ibb.co/ZL6hKqJ/records-example.png)
 
 ### Not Implemented (Yet):
 
