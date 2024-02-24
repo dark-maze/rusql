@@ -1,8 +1,8 @@
-use rusqlite::{Connection};
+use rusqlite::Connection;
 use std::env;
 use std::path::Path;
-use std::process::Command;
-use std::io::stdin;
+use std::collections::{HashMap, BTreeMap};
+use rusqlite::types::Value;
 
 struct DataBase{
 conn: Connection
@@ -10,10 +10,8 @@ conn: Connection
 
 enum Commands{
 Tables,
-Info,
-Records,
-Exit,
-Clear,
+Info(String),
+Records(String),
 }
 
 impl DataBase {
@@ -36,102 +34,141 @@ impl DataBase {
 		tables
 	}
 	
+	fn records(&self, name:&String) -> Option<Vec<HashMap<String, Value>>> {
+		let mut stmt = self
+				.conn
+				.prepare(format!("SELECT * FROM {}", name).as_str())
+				.expect(format!("Table {} doesn't exist", name).as_str());
+		
+		let columns_name: Vec<String> = stmt.column_names().into_iter().map(|name| name.to_string()).collect();		
+		let mut records = Vec::new();
+		let query_result = stmt.
+					query_map([], |row| {
+							let mut columns = HashMap::new();
+							for (index, name) in columns_name.iter().enumerate() {
+									if let Some(value) = row.get(index).ok(){
+										columns.insert(name.clone(), value);
+									}
+								}
+							Ok(columns)
+						}).ok()?;
+		for row in query_result {
+			records.push(row.ok()?);
+		}
+		Some(records)
+	}
 }
 
 fn main() {
 	let args: Vec<String> = env::args().collect();
-	if args.len() < 3  {
-		eprint!("Error args received are invalid");
-		return;
+	
+	if !validate_path(args[1].as_str()) {
+	println!("path {} doesn't exist please enter a valid path", args[1]);
+	return;
 	}
-	get_command(args);
+	if args.len() < 3 {
+	println!("Number of arguments is invalid");
+	return;
+	}
+
+	if let Some(commands) = check_args(&args){
+
+		if let Some(db) = connect(&args[1]) {
+			validate_commands(&db, commands);
+			}
+		else {
+			println!("faild connecting to the database");
+		}
+	}else{
+		println!("Command {} is not valid", args[2]);
+	}
 }
 
-fn get_command(command: Vec<String>){
-	match command[1].as_str() {
-		"connect" => {
-				if Path::new(&command[2]).exists() {
-						if let Some(db) = connect(&command[2]){
-								run(db);
-							}else{ println!("Error occured while trying to connect");} 
-								
+fn check_args(args: &Vec<String>) -> Option<Commands>{
+	let commands = match args[2].as_str() {
+		"-tables" => Commands::Tables,
+		"-records" => {
+				if args.len() <4 {
+						println!("Usage rusql dbpath command tablename");
+						return None;
 					}
-				else {	
-				println!("Error occured while connecting to {}, please check if the file exist", &command[2]);				
-				}
-			}
-		_ => {
-			println!("command {} is invalid", &command[1]);
-			}
-	}
-
-}
-
-fn run(db:DataBase){
-	clear_terminal();
-	loop{
-		println!("Please Enter Your Command\n");
-		let mut input = String::new();	
-		stdin()
-			.read_line(&mut input)
-			.expect("faild to get the command");
-		let input = input.trim();
-		println!("");
-		let command = match input{
-			 "tables" => Commands::Tables,
-			"records" => Commands::Records,
-			"info" => Commands::Info,
-			"clear" => Commands::Clear,
-			"exit" => Commands::Exit,
-			_ => {
-				println!("Command {} Not implemented yet", input);
-				continue;
-			},
-		};
-		match command {
-			Commands::Tables => fetch_table(&db),
-			Commands::Records => println!("Not Implemented Yet"),
-			Commands::Info => println!("Not Implemented Yet"),
-			Commands::Clear => clear_terminal(),
-			Commands::Exit => break,
-		};
-	}
-}
-
-
-fn clear_terminal(){
-	let _ = if cfg!(target_os = "windows") {
-        Command::new("cmd")
-            .args(&["/C", "cls"])
-            .status()
-    	} else {
-        Command::new("clear")
-            .status()
+				Commands::Records(args[3].clone())
+				},
+		"-info" => return None,
+		_ => return None,
 
 	};
+	Some(commands)
+}
+
+fn validate_commands(db:&DataBase, command: Commands) {
+	match command {
+	Commands::Tables => get_tables_name(db),
+	Commands::Records(table_name) => records(db, table_name),
+	Commands::Info(_table_name) => println!("Command not implemented yet"),
+	};
+}
+
+fn validate_path(path:&str) -> bool {
+	if Path::new(path).exists(){return true;}
+	else{return false;} 							
 }
 
 fn connect(path: &String) -> Option<DataBase>{
 	let conn = Connection::open(path);
 	match conn {
 			Ok(conn) => {
-					println!("Database {} opened", path);
 					return Some(DataBase::new(conn));
 				}
 			Err(err) => {
 					println!("Error occured {}", err);
 					return None;
 				}
-
 		}
 
-}
+} 
 
-fn fetch_table(db: &DataBase) {
+fn get_tables_name(db: &DataBase) {
 	let tables = db.get_tables();
-	println!("Tables Name");
+	println!("Tables: ");
 	for (index, table) in tables.iter().enumerate() {
 		println!("{}: {}", index + 1, table);
 	}
 	println!("");
+}
+
+fn records(db: &DataBase, table: String) {
+    if let Some(records) = db.records(&table) {
+        if !records.is_empty() {
+            println!("Records:");
+
+            let first_record = records.first().unwrap();
+            let mut header = String::new();
+            let mut keys_sorted: Vec<_> = first_record.keys().collect();
+            keys_sorted.sort();
+            for key in keys_sorted {
+                header += &format!("{:<12} ", key);
+            }
+            println!("{}", header);
+            
+            for record in records.iter() {
+                let mut row = String::new();
+                let record_ordered: BTreeMap<_, _> = record.iter().collect();
+                for (_, value) in &record_ordered {
+                    match value {
+                        Value::Text(text) => row += &format!("{:<12} ", text),
+                        Value::Integer(int) => row += &format!("{:<12} ", int),
+                        Value::Real(real) => row += &format!("{:<12} ", real),
+                        Value::Blob(blob) => row += &format!("{:<12?} ", blob),
+                        Value::Null => row += "NULL       ",
+                    }
+                }
+                println!("{}", row);
+            }
+        } else {
+            println!("There are no records to fetch");
+        }
+    } else {
+        println!("Table '{}' does not exist", table);
+    }
 }
