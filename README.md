@@ -22,6 +22,11 @@ A SQLite viewer in the command line interface (CLI) made with Rust.
 * **records--no**: Returns the number of records in a specific table.
 	* **Usage**: `rusql dbpath -records--no tablename`
 
+* **info**: Returns information about a specific table.
+	* **Usage**: `rusql dbpath -info -s tablename`
+  
+  ![Info Example](https://i.ibb.co/f9KHkdk/Screenshot-2024-03-07-165959.png)
+
 ### Not Implemented (Yet):
 
 * **info**: Returns information about a specific table.
