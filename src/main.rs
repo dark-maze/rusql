@@ -1,5 +1,5 @@
 use rusqlite::Connection;
-use std::env;
+use std::{env, fmt};
 use std::path::Path;
 use std::collections::{HashMap, BTreeMap};
 use rusqlite::types::Value;
@@ -9,12 +9,54 @@ struct DataBase{
 conn: Connection
 }
 
+pub struct TableInfo {
+    cid: i32,
+    name: String,
+    r#type: String,
+    notnull: bool,
+    dflt_value: Option<String>,
+    pk: bool,
+}
+
 enum Commands{
 Tables,
-Info(String),
+Info(Option<Vec<String>>),
 Records(String, Option<Vec<String>>),
 RecordsNo(String),
 }
+
+
+impl TableInfo {
+
+	fn new(cid: i32, name:String, r#type: String, notnull:bool, dflt_value: Option<String>, pk: bool) -> TableInfo {
+		TableInfo {
+			cid,
+			name,
+			r#type,
+			notnull,
+			dflt_value,
+			pk,
+		}
+	}	
+
+}
+
+
+impl fmt::Display for TableInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "CID: {}, Name: {}, Type: {}, Not Null: {}, Default Value: {:?}, Primary Key: {}",
+            self.cid,
+            self.name,
+            self.r#type,
+            self.notnull,
+            self.dflt_value,
+            self.pk
+        )
+    }
+}
+
 
 impl DataBase {
 	fn new(conn: Connection) -> DataBase {
@@ -71,13 +113,36 @@ impl DataBase {
 				.prepare(format!("SELECT COUNT(*) FROM {}", table).as_str()){
 					Ok(stmt) => stmt,
 					Err(err) => {
-						println!("Table doesn't exist");
+						println!("error occured {}", err);
 						return None;
 					}
 				};
 		let count = stmt
 				.query_row([], |row| row.get(0)).ok()?;
 		Some(count)
+	}
+
+	fn info(&self, table: Option<String>) -> Option<Vec<TableInfo>> {
+		match table {
+			Some(table) => {
+						let mut stmt = self
+								.conn
+								.prepare(format!("PRAGMA table_info({})", table).as_str())
+								.expect("something went wrong while trying to get tables from sqlite_master");
+						let column_len = stmt.column_count();
+						let info: Vec<TableInfo> = stmt
+								.query_map([], |row| {
+											Ok(TableInfo::new(row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?))
+										})
+								.expect("faild to get table info")
+								.map(|result| result.unwrap())
+								.collect();
+						Some(info)
+					},
+			None => return None,
+
+		}
+	
 	}
 }
 
@@ -93,7 +158,7 @@ fn main() {
 	return;
 	}
 
-	if let Some(commands) = check_args(&args){
+	if let Some(commands) = check_commands(&args){
 
 		if let Some(db) = connect(&args[1]) {
 			validate_commands(&db, commands);
@@ -102,26 +167,30 @@ fn main() {
 			println!("faild connecting to the database");
 		}
 	}else{
-		println!("invalid arguments");
+		println!("invalid command");
 	}
 }
 
-fn check_args(args: &Vec<String>) -> Option<Commands>{
+fn check_commands(args: &Vec<String>) -> Option<Commands>{
 	let commands = match args[2].as_str() {
 		"-tables" => Commands::Tables,
 		"-records" => {
-				if args.len() <4 {
+				if args.len() <= 4 {
 						return None;
 					}
-				if args.len() > 4 {Commands::Records(args[3].clone(), Some(args[4..].to_vec()))}
-				else {Commands::Records(args[3].clone(), None)}
+				Commands::Records(args[3].clone(), Some(args[4..].to_vec()))
 				},
 		"-records--no" => {
-					if args.len() <4 {
+					if args.len() !=4 {
 						return None;
 						}
 					Commands::RecordsNo(args[3].clone())},
-		"-info" => return None,
+		"-info" => {
+				if args.len() <=3 {
+						return None;
+						}
+				Commands::Info(Some(args[3..].to_vec()))
+				},
 		_ => return None,
 
 	};
@@ -133,7 +202,7 @@ fn validate_commands(db:&DataBase, command: Commands) {
 	Commands::Tables => get_tables_name(db),
 	Commands::Records(table_name, records_size) => records(db, table_name, records_size),
 	Commands::RecordsNo(table_name) => get_number_of_records(db, table_name),
-	Commands::Info(_table_name) => println!("Command not implemented yet"),
+	Commands::Info(args) => info(db, args),
 	};
 }
 
@@ -263,3 +332,32 @@ fn get_records_len(arg: Option<Vec<String>>, no_of_records: usize) -> Option<usi
 	};
 		no_of_records
 }
+
+fn info(db: &DataBase, command: Option<Vec<String>>) {
+	match command {
+		Some(command) => {
+					match command[0].as_str() {
+							"-s" => {
+
+								if command.len() != 2 {
+										println!("Please check if the entered arguments are valid");
+										return;
+									}
+								print_info(db.info(Some(command[1].clone())).expect("something went wrong"))
+
+									}, 					
+							_ => println!("Invalid Arguments"),
+						};
+					},
+			
+		None =>println!("Please make sure you entered a vaild command"),
+		}	
+
+}
+
+fn print_info(data: Vec<TableInfo>) {
+	for col in data {
+		println!("{}", col);
+	}
+}
+
