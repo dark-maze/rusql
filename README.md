@@ -29,7 +29,6 @@ A SQLite viewer in the command line interface (CLI) made with Rust.
 
 ### Not Implemented (Yet):
 
-* **info**: Returns information about a specific table.
 * **sql**: Allows running SQL queries.
 
 More commands will be added in future updates.
